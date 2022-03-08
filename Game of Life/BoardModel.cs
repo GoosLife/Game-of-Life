@@ -7,7 +7,7 @@ using The_Console_Application;
 
 namespace Game_of_Life
 {
-    internal class BoardModel : Grid
+    public class BoardModel : Grid
     {
         public int CellSize { get; set; }
         public double LiveDensity { get; set; }

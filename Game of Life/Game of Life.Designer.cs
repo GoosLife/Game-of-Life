@@ -102,6 +102,11 @@
             // 
             this.nudSize.Anchor = System.Windows.Forms.AnchorStyles.Top;
             this.nudSize.Location = new System.Drawing.Point(181, 13);
+            this.nudSize.Minimum = new decimal(new int[] {
+            5,
+            0,
+            0,
+            0});
             this.nudSize.Name = "nudSize";
             this.nudSize.Size = new System.Drawing.Size(50, 20);
             this.nudSize.TabIndex = 1;
@@ -167,7 +172,7 @@
             // 
             // btnColor
             // 
-            this.btnColor.Location = new System.Drawing.Point(25, 39);
+            this.btnColor.Location = new System.Drawing.Point(15, 39);
             this.btnColor.Name = "btnColor";
             this.btnColor.Size = new System.Drawing.Size(75, 23);
             this.btnColor.TabIndex = 7;
@@ -342,7 +347,7 @@
             this.Controls.Add(this.pbBoard);
             this.Controls.Add(this.pictureBox1);
             this.Name = "Form1";
-            this.Text = "Conway\'s Game of Life";
+            this.Text = "Continue";
             this.Resize += new System.EventHandler(this.Form1_Resize);
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbBoard)).EndInit();

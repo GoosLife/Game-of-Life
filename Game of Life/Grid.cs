@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace The_Console_Application
 {
-    internal class Grid
+    public class Grid
     {
         /// <summary>
         /// Width of grid

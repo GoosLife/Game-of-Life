@@ -15,6 +15,9 @@ namespace Game_of_Life
     {
         BoardModel board;
         int generation;
+        Color gridColor;
+        int excessRemovedHeight;
+        int excessRemovedWidth;
 
         // For drawing on bitmap
         Point lastPoint = Point.Empty;
@@ -27,111 +30,12 @@ namespace Game_of_Life
         {
             InitializeComponent();
 
-            generation = 0;
-
-            board = new BoardModel(
-                r: pbBoard.Width / (int)nudSize.Value,
-                c: pbBoard.Height / (int)nudSize.Value,
-                cellSize: (int)nudSize.Value,
-                liveDensity: (double)nudDensity.Value / 100);
-        }
-
-        // Clear the board entirely
-        private void ClearBoard()
-        {
-            for (int col = 0; col < board.Col; col++)
-            {
-                for (int row = 0; row < board.Row; row++)
-                {
-                    board.Cells[row, col] = false;
-                }
-            }
-        }
-
-        public void Reset()
-        {
-            generation = 0;
-            lblGeneration.Text = "Generation " + generation.ToString() + " | Living cells: " + board.LivingCells.ToString();
-
-            ResetGraphics();
-        }
-
-        /// <summary>
-        /// Takes the existing bitmap and replaces it with a blank screen
-        /// </summary>
-        private void ResetGraphics()
-        {
-            using (var bmp = new Bitmap(pbBoard.Width, pbBoard.Height))
-            using (var gfx = Graphics.FromImage(bmp))
-            using (var cellBrush = new SolidBrush(colorDialog1.Color))
-            {
-                gfx.Clear(Color.Black);
-
-                pbBoard.Image = (Bitmap)bmp.Clone();
-            }
-
-            if (timer1.Enabled)
-            {
-                timer1.Enabled = false;
-                Controls["btnPause"].Text = "Go";
-
-            }
-        }
-
-        /// <summary>
-        /// Ticks game and draws to board.
-        /// </summary>
-        private void TickGame()
-        {
-            board.Grow();
-            Render();
-
-            generation++;
-            lblGeneration.Text = "Generation " + generation.ToString() + " | Living cells: " + board.LivingCells.ToString();
-        }
-        
-        /// <summary>
-        /// Ticks game without rendering output. Doesn't update the generations label, either.
-        /// </summary>
-        private void TickGameLogic()
-        {
-            board.Grow();
+            GenerateBoard();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
         {
             TickGame();
-        }
-
-        private void Render()
-        {
-            using (var bmp = new Bitmap(pbBoard.Width, pbBoard.Height))
-            using (var gfx = Graphics.FromImage(bmp))
-            using (var cellBrush = new SolidBrush(colorDialog1.Color))
-            using (var hoverBrush = new SolidBrush(Color.Red))
-            {
-                gfx.Clear(Color.Black);
-
-                var cellSize = (board.CellSize > 1) ?
-                                new Size(board.CellSize - 1, board.CellSize - 1) :
-                                new Size(board.CellSize, board.CellSize);
-
-                for (int col = 0; col < board.Col; col++)
-                {
-                    for (int row = 0; row < board.Row; row++)
-                    {
-                        var cell = board.Cells[row, col];
-                        if (cell)
-                        {
-                            var cellLocation = new Point(row * board.CellSize, col * board.CellSize);
-                            var cellRect = new Rectangle(cellLocation, cellSize);
-                            gfx.FillRectangle(cellBrush, cellRect);
-                        }
-                    }
-                }
-
-                pbBoard.Image = (Bitmap)bmp.Clone();
-            }
         }
 
         /// <summary>
@@ -142,28 +46,15 @@ namespace Game_of_Life
         private void nudSize_ValueChanged(object sender, EventArgs e)
         {
             board.CellSize = (int)nudSize.Value;
+            
+            ResizeBoard();
+
             Render();
         }
 
         private void btnPause_Click(object sender, EventArgs e)
         {
-            if (timer1.Enabled)
-            {
-                timer1.Enabled = false;
-                Controls["btnPause"].Text = "Go";
-                
-            }
-            else
-            {
-                timer1.Enabled = true;
-                Controls["btnPause"].Text = "Pause";
-            }
-            
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-
+            TogglePause();
         }
 
         private void btnColor_Click(object sender, EventArgs e)
@@ -173,28 +64,14 @@ namespace Game_of_Life
 
         private void btnApply_Click(object sender, EventArgs e)
         {
-            if (timer1.Enabled)
+            PauseGame();
+
+            if (MessageBox.Show("This will start a new game with the selected parameters. Continue?", "Start new game", MessageBoxButtons.OKCancel) == DialogResult.OK)
             {
-                btnPause_Click(sender, e);
+                GenerateBoard();
             }
 
-            if (MessageBox.Show("This will start a new game with the selected parameters. Continue?", "Caption", MessageBoxButtons.OKCancel) == DialogResult.OK)
-            {
-                // Generate new board
-                board = new BoardModel(
-                    r: pbBoard.Width / (int)nudSize.Value,
-                    c: pbBoard.Height / (int)nudSize.Value,
-                    cellSize: (int)nudSize.Value,
-                    liveDensity: (double)nudDensity.Value / 100);
-
-                // Reset game
-                Reset();
-            }
-
-            if (!timer1.Enabled)
-            {
-                btnPause_Click(sender, e);
-            }
+            UnpauseGame();
         }
 
         private void btnTick_Click(object sender, EventArgs e)
@@ -223,8 +100,7 @@ namespace Game_of_Life
 
         private void btnReset_Click(object sender, EventArgs e)
         {
-            ClearBoard();
-
+            PauseGame();
             Reset();
         }
 
@@ -443,7 +319,7 @@ namespace Game_of_Life
                 using (Graphics g = Graphics.FromImage(pbBoard.Image))
                 using (var lastHoverBrush = new SolidBrush(Color.Black))
                 using (var restoreBrush = new SolidBrush(colorDialog1.Color))
-                using (var hoverBrush = new SolidBrush(Color.Red))
+                using (var hoverBrush = new SolidBrush(Color.DarkCyan))
                 {
                     try
                     {
@@ -514,38 +390,7 @@ namespace Game_of_Life
         // Resize the playable area after resizing the window
         private void Form1_Resize(object sender, EventArgs e)
         {
-            int newRow = pbBoard.Width / (int)nudSize.Value;
-            int newCol = pbBoard.Height / (int)nudSize.Value;
-            board.CellSize = (int)nudSize.Value;
-            board.LiveDensity = (double)nudDensity.Value / 100;
-
-            bool[,] newCells = new bool[newRow, newCol];
-            
-            for (int col = 0; col < board.Col; col++)
-            {
-                for (int row = 0; row < board.Row; row++)
-                {
-                    if (!(row > (newRow - 1)))
-                    {
-                        if (!(col > (newCol - 1)))
-                            newCells[row, col] = board.Cells[row, col];
-                    }
-                }
-            }
-
-            board.Col = newCol;
-            board.Row = newRow;
-
-            board.Cells = newCells;
-
-            try
-            {
-                Render();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
+            ResizeBoard();
         }
 
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
@@ -556,6 +401,243 @@ namespace Game_of_Life
         private void backgroundWorker1_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
 
+        }
+
+        private void btnContinue_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        // *********************
+        // * DRAWING FUNCTIONS *
+        // *********************
+
+        /// <summary>
+        /// Renders the board once.
+        /// </summary>
+        private void Render()
+        {
+            try
+            {
+                using (var bmp = new Bitmap(pbBoard.Width, pbBoard.Height))
+                using (var gfx = Graphics.FromImage(bmp))
+                using (var cellBrush = new SolidBrush(colorDialog1.Color))
+                using (var hoverBrush = new SolidBrush(Color.DarkCyan))
+                using (var emptyBrush = new SolidBrush(Color.Black))
+                {
+                    gfx.Clear(Color.DarkGray);
+
+                    var cellSize = (board.CellSize > 1) ?
+                                    new Size(board.CellSize - 1, board.CellSize - 1) :
+                                    new Size(board.CellSize, board.CellSize);
+
+                    for (int col = 0; col < board.Col; col++)
+                    {
+                        for (int row = 0; row < board.Row; row++)
+                        {
+                            var cell = board.Cells[row, col];
+                            if (cell)
+                            {
+                                var cellLocation = new Point(row * board.CellSize, col * board.CellSize);
+                                var cellRect = new Rectangle(cellLocation, cellSize);
+                                gfx.FillRectangle(cellBrush, cellRect);
+                            }
+                            else
+                            {
+                                var squareLocation = new Point(row * board.CellSize, col * board.CellSize);
+                                var squareRect = new Rectangle(squareLocation, cellSize);
+                                gfx.FillRectangle(emptyBrush, squareRect);
+                            }
+                        }
+                    }
+
+                    pbBoard.Image = (Bitmap)bmp.Clone();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(board.Width + " " + board.Height);
+
+                using (var bmp = new Bitmap(board.Width, board.Height))
+                using (var gfx = Graphics.FromImage(bmp))
+                using (var cellBrush = new SolidBrush(colorDialog1.Color))
+                using (var hoverBrush = new SolidBrush(Color.Red))
+                {
+                    gfx.Clear(Color.Black);
+
+                    var cellSize = (board.CellSize > 1) ?
+                                    new Size(board.CellSize - 1, board.CellSize - 1) :
+                                    new Size(board.CellSize, board.CellSize);
+
+                    for (int col = 0; col < board.Col; col++)
+                    {
+                        for (int row = 0; row < board.Row; row++)
+                        {
+                            var cell = board.Cells[row, col];
+                            if (cell)
+                            {
+                                var cellLocation = new Point(row * board.CellSize, col * board.CellSize);
+                                var cellRect = new Rectangle(cellLocation, cellSize);
+                                gfx.FillRectangle(cellBrush, cellRect);
+                            }
+                        }
+                    }
+
+                    pbBoard.Image = (Bitmap)bmp.Clone();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clear the board of all living cells.
+        /// </summary>
+        private void ClearBoard()
+        {
+            for (int col = 0; col < board.Col; col++)
+            {
+                for (int row = 0; row < board.Row; row++)
+                {
+                    board.Cells[row, col] = false;
+                }
+            }
+
+            Render(); // Renders the now cleared board.
+        }
+
+        // ******************************
+        // * GAME MANAGER FUNCTIONALITY *
+        // ******************************
+
+        /// <summary>
+        /// Ticks game and draws to board.
+        /// </summary>
+        private void TickGame()
+        {
+            board.Grow();
+            Render();
+
+            generation++;
+            lblGeneration.Text = "Generation " + generation.ToString() + " | Living cells: " + board.LivingCells.ToString();
+        }
+
+        /// <summary>
+        /// Reset the game (counters, etc.)
+        /// </summary>
+        public void Reset()
+        {
+            generation = 0;
+            board.LivingCells = 0;
+            lblGeneration.Text = "Generation " + generation.ToString() + " | Living cells: " + board.LivingCells.ToString();
+
+            ClearBoard();
+        }
+
+        /// <summary>
+        /// Generates a board for the game of life.
+        /// </summary>
+        public void GenerateBoard()
+        {
+            board = new BoardModel(
+                r: (pbBoard.Width / (int)nudSize.Value) + (int)nudSize.Value,
+                c: (pbBoard.Height / (int)nudSize.Value) + (int)nudSize.Value,
+                cellSize: (int)nudSize.Value,
+                liveDensity: (double)nudDensity.Value / 100);
+        }
+
+        /// <summary>
+        /// Resize the board
+        /// </summary>
+        private void ResizeBoard()
+        {
+            if (pbBoard.Width > 0 && pbBoard.Height > 0)
+            {
+
+                int newRow = (pbBoard.Width / (int)nudSize.Value) + (int)nudSize.Value;
+                int newCol = (pbBoard.Height / (int)nudSize.Value) + (int)nudSize.Value;
+
+                board.CellSize = (int)nudSize.Value;
+                board.LiveDensity = (double)nudDensity.Value / 100;
+
+                bool[,] newCells = new bool[newRow, newCol];
+
+                for (int col = 0; col < board.Col; col++)
+                {
+                    for (int row = 0; row < board.Row; row++)
+                    {
+                        if (!(row > (newRow - 1)))
+                        {
+                            if (!(col > (newCol - 1)))
+                                newCells[row, col] = board.Cells[row, col];
+                        }
+                    }
+                }
+
+                board.Col = newCol;
+                board.Row = newRow;
+
+                board.Cells = newCells;
+
+                try
+                {
+                    Render();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
+            }
+        }
+
+        // TIME CONTROLS
+
+        /// <summary>
+        /// Pauses the game if the game is unpaused.
+        /// </summary>
+        public void PauseGame()
+        {
+            if (timer1.Enabled)
+            {
+                TogglePause();
+
+            }
+        }
+        
+        /// <summary>
+        /// Unpauses the game if it is currently paused.
+        /// </summary>
+        public void UnpauseGame()
+        {
+            if (!timer1.Enabled)
+            {
+                TogglePause();
+            }
+        }
+
+        /// <summary>
+        /// Toggles between the paused/unpaused state.
+        /// </summary>
+        public void TogglePause()
+        {
+            if (timer1.Enabled)
+            {
+                timer1.Enabled = false;
+                Controls["btnPause"].Text = "Go";
+
+            }
+            else
+            {
+                timer1.Enabled = true;
+                Controls["btnPause"].Text = "Pause";
+            }
+
+        }
+
+        /// <summary>
+        /// Ticks game without rendering output. Doesn't update the generations label, either.
+        /// </summary>
+        private void TickGameLogic()
+        {
+            board.Grow();
         }
     }
 }
